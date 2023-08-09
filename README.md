@@ -1,6 +1,7 @@
 # Complete Modular BlockChain
 
-this project gonna be a production ready blockchain that use EVM (Ethereuem Virtual Machine)
+This project gonna be a production ready modular blockchain that use **EVM** (Ethereuem Virtual Machine)
+for smart contract and **JSON RPC** for communication
 
 ## Run
 
