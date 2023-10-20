@@ -14,50 +14,49 @@ type PrivateKey struct {
 	key *ecdsa.PrivateKey
 }
 
-func (p PrivateKey) Sign(b []byte) (*Signature, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, p.key, b)
+func (k PrivateKey) Sign(data []byte) (*Signature, error) {
+	r, s, err := ecdsa.Sign(rand.Reader, k.key, data)
 	if err != nil {
 		return nil, err
 	}
-
-	return &Signature{r, s}, nil
+	return &Signature{
+		R: r,
+		S: s,
+	}, nil
 }
-
 func GeneratePrivateKey() PrivateKey {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		panic(err)
 	}
-
 	return PrivateKey{
 		key: key,
 	}
 }
 
-func (pk *PrivateKey) PublicKey() PublicKey {
-	return PublicKey{
-		Key: &pk.key.PublicKey,
-	}
+func (k PrivateKey) PublicKey() PublicKey {
+	return elliptic.MarshalCompressed(k.key.PublicKey, k.key.PublicKey.X, k.key.PublicKey.Y)
 }
 
-type PublicKey struct {
-	Key *ecdsa.PublicKey
-}
+type PublicKey []byte
 
-func (k PublicKey) ToSlice() []byte {
-	return elliptic.MarshalCompressed(k.Key, k.Key.X, k.Key.Y)
-}
+func (k PublicKey) Address() types.Address {
+	h := sha256.Sum256(k)
 
-func (k *PublicKey) Address() types.Address {
-	h := sha256.Sum256(k.ToSlice())
-
-	return types.NewAddressFromBytes(h[len(h)-20:])
+	return types.AddressFromBytes(h[len(h)-20:])
 }
 
 type Signature struct {
-	R, S *big.Int
+	S, R *big.Int
 }
 
-func (sig *Signature) Verify(pubKey PublicKey, data []byte) bool {
-	return ecdsa.Verify(pubKey.Key, data, sig.R, sig.S)
+func (sig Signature) Verify(pubKey PublicKey, data []byte) bool {
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pubKey)
+	key := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	return ecdsa.Verify(key, data, sig.R, sig.S)
 }

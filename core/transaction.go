@@ -8,14 +8,12 @@ import (
 )
 
 type Transaction struct {
-	Data []byte
-
+	Data      []byte
 	From      crypto.PublicKey
 	Signature *crypto.Signature
+
 	// cached version of the tx data hash
 	hash types.Hash
-	// initialized timeStamp
-	firstSeen int64
 }
 
 func NewTransaction(data []byte) *Transaction {
@@ -24,11 +22,10 @@ func NewTransaction(data []byte) *Transaction {
 	}
 }
 
-func (tx *Transaction) Hash(h Hasher[*Transaction]) types.Hash {
+func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
 	if tx.hash.IsZero() {
-		tx.hash = h.Hash(tx)
+		tx.hash = hasher.Hash(tx)
 	}
-
 	return tx.hash
 }
 
@@ -62,12 +59,4 @@ func (tx *Transaction) Decode(dec Decoder[*Transaction]) error {
 
 func (tx *Transaction) Encode(enc Encoder[*Transaction]) error {
 	return enc.Encode(tx)
-}
-
-func (tx *Transaction) SetFirstSeen(t int64) {
-	tx.firstSeen = t
-}
-
-func (tx *Transaction) FirstSeen() int64 {
-	return tx.firstSeen
 }

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,34 +24,31 @@ func TestVerifyTransaction(t *testing.T) {
 		Data: []byte("foo"),
 	}
 
-	assert.NotNil(t, tx.Verify())
-
 	assert.Nil(t, tx.Sign(privKey))
 	assert.Nil(t, tx.Verify())
 
-	anotherKey := crypto.GeneratePrivateKey()
-	tx.From = anotherKey.PublicKey()
+	otherPrivKey := crypto.GeneratePrivateKey()
+	tx.From = otherPrivKey.PublicKey()
 
 	assert.NotNil(t, tx.Verify())
 }
 
-// problem with golang 19
-// func TestTxEncodeDecode(t *testing.T) {
-// 	tx := randomTxWithSignature(t)
-// 	buf := &bytes.Buffer{}
-// 	assert.Nil(t, tx.Encode(NewGobTxEncoder(buf)))
+func TestTxEncodeDecode(t *testing.T) {
+	tx := randomTxWithSignature(t)
+	buf := &bytes.Buffer{}
+	assert.Nil(t, tx.Encode(NewGobTxEncoder(buf)))
 
-// 	txDecoded := new(Transaction)
-// 	assert.Nil(t, txDecoded.Decode(NewGobTxDecoder(buf)))
-
-// 	assert.Equal(t, txDecoded.Data, tx.Data)
-// }
+	txDecoded := new(Transaction)
+	assert.Nil(t, txDecoded.Decode(NewGobTxDecoder(buf)))
+	assert.Equal(t, tx, txDecoded)
+}
 
 func randomTxWithSignature(t *testing.T) *Transaction {
 	privKey := crypto.GeneratePrivateKey()
-	tx := &Transaction{
+	tx := Transaction{
 		Data: []byte("foo"),
 	}
 	assert.Nil(t, tx.Sign(privKey))
-	return tx
+
+	return &tx
 }

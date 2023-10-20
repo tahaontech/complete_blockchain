@@ -2,8 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
+	"time"
 
 	"github.com/tahaontech/complete_blockchain/crypto"
 	"github.com/tahaontech/complete_blockchain/types"
@@ -14,7 +16,7 @@ type Header struct {
 	DataHash      types.Hash
 	PrevBlockHash types.Hash
 	Height        uint32
-	TimeStamp     int64
+	Timestamp     int64
 }
 
 func (h *Header) Bytes() []byte {
@@ -26,24 +28,41 @@ func (h *Header) Bytes() []byte {
 }
 
 type Block struct {
-	Header
-	Transactions []Transaction
+	*Header
+	Transactions []*Transaction
 	Validator    crypto.PublicKey
 	Signature    *crypto.Signature
 
-	// Cached version of the block hash
+	// Cached version of the header hash
 	hash types.Hash
 }
 
-func NewBlock(h *Header, txx []Transaction) *Block {
+func NewBlock(h *Header, txx []*Transaction) (*Block, error) {
 	return &Block{
-		Header:       *h,
+		Header:       h,
 		Transactions: txx,
+	}, nil
+}
+
+func NewBlockFromPrevHeader(prevHeader *Header, txx []*Transaction) (*Block, error) {
+	dataHash, err := CalculateDataHash(txx)
+	if err != nil {
+		return nil, err
 	}
+
+	header := &Header{
+		Version:       1,
+		Height:        prevHeader.Height + 1,
+		DataHash:      dataHash,
+		PrevBlockHash: BlockHasher{}.Hash(prevHeader),
+		Timestamp:     time.Now().UnixNano(),
+	}
+
+	return NewBlock(header, txx)
 }
 
 func (b *Block) AddTransaction(tx *Transaction) {
-	b.Transactions = append(b.Transactions, *tx)
+	b.Transactions = append(b.Transactions, tx)
 }
 
 func (b *Block) Sign(privKey crypto.PrivateKey) error {
@@ -64,15 +83,23 @@ func (b *Block) Verify() error {
 	}
 
 	if !b.Signature.Verify(b.Validator, b.Header.Bytes()) {
-		return fmt.Errorf("invalid block signature")
+		return fmt.Errorf("block has invalid signature")
 	}
 
 	for _, tx := range b.Transactions {
-		err := tx.Verify()
-		if err != nil {
+		if err := tx.Verify(); err != nil {
 			return err
 		}
 	}
+
+	dataHash, err := CalculateDataHash(b.Transactions)
+	if err != nil {
+		return err
+	}
+	if dataHash != b.DataHash {
+		return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
+	}
+
 	return nil
 }
 
@@ -86,8 +113,22 @@ func (b *Block) Encode(enc Encoder[*Block]) error {
 
 func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
 	if b.hash.IsZero() {
-		b.hash = hasher.Hash(&b.Header)
+		b.hash = hasher.Hash(b.Header)
 	}
 
 	return b.hash
+}
+
+func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
+	buf := &bytes.Buffer{}
+
+	for _, tx := range txx {
+		if err = tx.Encode(NewGobTxEncoder(buf)); err != nil {
+			return
+		}
+	}
+
+	hash = sha256.Sum256(buf.Bytes())
+
+	return
 }

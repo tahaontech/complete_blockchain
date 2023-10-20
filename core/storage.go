@@ -4,13 +4,13 @@ type Storage interface {
 	Put(*Block) error
 }
 
-type MemStore struct {
+type MemoryStore struct {
 }
 
-func NewMemStore() *MemStore {
-	return &MemStore{}
+func NewMemorystore() *MemoryStore {
+	return &MemoryStore{}
 }
 
-func (m *MemStore) Put(b *Block) error {
+func (s *MemoryStore) Put(b *Block) error {
 	return nil
 }

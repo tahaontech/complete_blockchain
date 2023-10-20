@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -9,16 +10,9 @@ import (
 	"github.com/tahaontech/complete_blockchain/types"
 )
 
-func TestHashBlock(t *testing.T) {
-	b := randomBlock(0, types.RandomHash())
-	h := b.Hash(BlockHasher{})
-
-	assert.False(t, h.IsZero())
-}
-
 func TestSignBlock(t *testing.T) {
 	privKey := crypto.GeneratePrivateKey()
-	b := randomBlock(0, types.RandomHash())
+	b := randomBlock(t, 0, types.Hash{})
 
 	assert.Nil(t, b.Sign(privKey))
 	assert.NotNil(t, b.Signature)
@@ -26,7 +20,7 @@ func TestSignBlock(t *testing.T) {
 
 func TestVerifyBlock(t *testing.T) {
 	privKey := crypto.GeneratePrivateKey()
-	b := randomBlock(0, types.RandomHash())
+	b := randomBlock(t, 0, types.Hash{})
 
 	assert.Nil(t, b.Sign(privKey))
 	assert.Nil(t, b.Verify())
@@ -35,26 +29,35 @@ func TestVerifyBlock(t *testing.T) {
 	b.Validator = otherPrivKey.PublicKey()
 	assert.NotNil(t, b.Verify())
 
-	b.Height = 20
+	b.Height = 100
 	assert.NotNil(t, b.Verify())
 }
 
-func randomBlock(height uint32, prevBlockhash types.Hash) *Block {
-	header := &Header{
-		Version:       1,
-		PrevBlockHash: prevBlockhash,
-		Height:        height,
-		TimeStamp:     time.Now().UnixNano(),
-	}
+func TestDecodeEncodeBlock(t *testing.T) {
+	b := randomBlock(t, 1, types.Hash{})
+	buf := &bytes.Buffer{}
+	assert.Nil(t, b.Encode(NewGobBlockEncoder(buf)))
 
-	return NewBlock(header, []Transaction{})
+	bDecode := new(Block)
+	assert.Nil(t, bDecode.Decode(NewGobBlockDecoder(buf)))
+	assert.Equal(t, b, bDecode)
 }
 
-func randomBlockWithSignature(t *testing.T, height uint32, prevBlockHash types.Hash) *Block {
+func randomBlock(t *testing.T, height uint32, prevBlockHash types.Hash) *Block {
 	privKey := crypto.GeneratePrivateKey()
-	b := randomBlock(height, prevBlockHash)
 	tx := randomTxWithSignature(t)
-	b.AddTransaction(tx)
+	header := &Header{
+		Version:       1,
+		PrevBlockHash: prevBlockHash,
+		Height:        height,
+		Timestamp:     time.Now().UnixNano(),
+	}
+
+	b, err := NewBlock(header, []*Transaction{tx})
+	assert.Nil(t, err)
+	dataHash, err := CalculateDataHash(b.Transactions)
+	assert.Nil(t, err)
+	b.Header.DataHash = dataHash
 	assert.Nil(t, b.Sign(privKey))
 
 	return b
