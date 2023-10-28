@@ -35,15 +35,15 @@ func main() {
 		}
 	}()
 
-	go func() {
-		time.Sleep(7 * time.Second)
+	// go func() {
+	// 	time.Sleep(7 * time.Second)
 
-		trLate := network.NewLocalTransport("LATE_REMOTE")
-		trRemoteC.Connect(trLate)
-		lateServer := makeServer(string(trLate.Addr()), trLate, nil)
+	// 	trLate := network.NewLocalTransport("LATE_REMOTE")
+	// 	trRemoteC.Connect(trLate)
+	// 	lateServer := makeServer(string(trLate.Addr()), trLate, nil)
 
-		go lateServer.Start()
-	}()
+	// 	go lateServer.Start()
+	// }()
 
 	privKey := crypto.GeneratePrivateKey()
 	localServer := makeServer("LOCAL", trLocal, &privKey)
@@ -75,8 +75,7 @@ func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network
 
 func sendTransaction(tr network.Transport, to network.NetAddr) error {
 	privKey := crypto.GeneratePrivateKey()
-	data := []byte{0x01, 0x0a, 0x03, 0x0a, 0x0b}
-	tx := core.NewTransaction(data)
+	tx := core.NewTransaction(contract())
 	tx.Sign(privKey)
 
 	buf := &bytes.Buffer{}
@@ -86,4 +85,13 @@ func sendTransaction(tr network.Transport, to network.NetAddr) error {
 
 	msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
 	return tr.SendMessage(to, msg.Bytes())
+}
+
+func contract() []byte {
+	pushFoo := []byte{0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d}
+	data := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0x0f}
+	data = append(data, pushFoo...)
+	data = append(data, 0xae)
+
+	return data
 }
