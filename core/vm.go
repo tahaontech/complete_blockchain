@@ -9,13 +9,10 @@ type Instruction byte
 const (
 	InstrPushInt  Instruction = 0x0a // 10
 	InstrAdd      Instruction = 0x0b // 11
-	InstrPushByte Instruction = 0x0c // 12
-	InstrPack     Instruction = 0x0d // 13
-	InstrSub      Instruction = 0x0e // 14
-	InstrStore    Instruction = 0x0f // 15
-	InstrGet      Instruction = 0xae
-	InstrMul      Instruction = 0xea
-	InstrDiv      Instruction = 0xfd
+	InstrPushByte Instruction = 0x0c
+	InstrPack     Instruction = 0x0d
+	InstrSub      Instruction = 0x0e
+	InstrStore    Instruction = 0x0f
 )
 
 type Stack struct {
@@ -31,8 +28,7 @@ func NewStack(size int) *Stack {
 }
 
 func (s *Stack) Push(v any) {
-	s.data = append([]any{v}, s.data...)
-	// s.data[s.sp] = v
+	s.data[s.sp] = v
 	s.sp++
 }
 
@@ -46,17 +42,17 @@ func (s *Stack) Pop() any {
 
 type VM struct {
 	data          []byte
-	ip            int // instruction point
+	ip            int // instruction pointer
 	stack         *Stack
 	contractState *State
 }
 
-func NewVM(data []byte, state *State) *VM {
+func NewVM(data []byte, contractState *State) *VM {
 	return &VM{
+		contractState: contractState,
 		data:          data,
 		ip:            0,
 		stack:         NewStack(128),
-		contractState: state,
 	}
 }
 
@@ -80,40 +76,27 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
-	case InstrGet:
-		key := vm.stack.Pop().([]byte)
-
-		value, err := vm.contractState.Get(key)
-		if err != nil {
-			return err
-		}
-
-		vm.stack.Push(value)
-
 	case InstrStore:
 		var (
 			key             = vm.stack.Pop().([]byte)
 			value           = vm.stack.Pop()
-			serializedvalue []byte
+			serializedValue []byte
 		)
 
 		switch v := value.(type) {
 		case int:
-			serializedvalue = serializeInt64(int64(v))
+			serializedValue = serializeInt64(int64(v))
 		default:
 			panic("TODO: unknown type")
-
 		}
 
-		if err := vm.contractState.Put(key, serializedvalue); err != nil {
-			return err
-		}
+		vm.contractState.Put(key, serializedValue)
 
 	case InstrPushInt:
 		vm.stack.Push(int(vm.data[vm.ip-1]))
 
 	case InstrPushByte:
-		vm.stack.Push(vm.data[vm.ip-1])
+		vm.stack.Push(byte(vm.data[vm.ip-1]))
 
 	case InstrPack:
 		n := vm.stack.Pop().(int)
@@ -136,19 +119,6 @@ func (vm *VM) Exec(instr Instruction) error {
 		b := vm.stack.Pop().(int)
 		c := a + b
 		vm.stack.Push(c)
-
-	case InstrMul:
-		a := vm.stack.Pop().(int)
-		b := vm.stack.Pop().(int)
-		c := a * b
-		vm.stack.Push(c)
-
-	case InstrDiv:
-		b := vm.stack.Pop().(int)
-		a := vm.stack.Pop().(int)
-		c := a / b
-		vm.stack.Push(c)
-
 	}
 
 	return nil
@@ -162,6 +132,6 @@ func serializeInt64(value int64) []byte {
 	return buf
 }
 
-func deserializedInt64(b []byte) int64 {
+func deserializeInt64(b []byte) int64 {
 	return int64(binary.LittleEndian.Uint64(b))
 }

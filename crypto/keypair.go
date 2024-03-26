@@ -5,6 +5,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"math/big"
 
 	"github.com/tahaontech/complete_blockchain/types"
@@ -19,19 +21,26 @@ func (k PrivateKey) Sign(data []byte) (*Signature, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Signature{
 		R: r,
 		S: s,
 	}, nil
 }
-func GeneratePrivateKey() PrivateKey {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+func NewPrivateKeyFromReader(r io.Reader) PrivateKey {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), r)
 	if err != nil {
 		panic(err)
 	}
+
 	return PrivateKey{
 		key: key,
 	}
+}
+
+func GeneratePrivateKey() PrivateKey {
+	return NewPrivateKeyFromReader(rand.Reader)
 }
 
 func (k PrivateKey) PublicKey() PublicKey {
@@ -40,6 +49,10 @@ func (k PrivateKey) PublicKey() PublicKey {
 
 type PublicKey []byte
 
+func (k PublicKey) String() string {
+	return hex.EncodeToString(k)
+}
+
 func (k PublicKey) Address() types.Address {
 	h := sha256.Sum256(k)
 
@@ -47,7 +60,13 @@ func (k PublicKey) Address() types.Address {
 }
 
 type Signature struct {
-	S, R *big.Int
+	S *big.Int
+	R *big.Int
+}
+
+func (sig Signature) String() string {
+	b := append(sig.S.Bytes(), sig.R.Bytes()...)
+	return hex.EncodeToString(b)
 }
 
 func (sig Signature) Verify(pubKey PublicKey, data []byte) bool {
